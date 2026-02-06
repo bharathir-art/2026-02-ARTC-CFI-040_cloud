@@ -7,8 +7,8 @@ import os
 
 app = FastAPI()
 
-# --- 1. PRE-INITIALIZE VARIABLES ---
-# This prevents the "NameError: model is not defined" if the load fails
+# --- 1. INITIALIZE VARIABLES AT THE TOP ---
+# This ensures 'model' exists even if loading fails
 model = None
 scaler = None
 pca = None
@@ -20,9 +20,9 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 # --- 2. MODEL LOADING ---
 try:
     model_path = os.path.join(BASE_DIR, 'ids_model.h5')
-    # Use compile=False to bypass version-specific training configurations
+    # Using compile=False to bypass the version mismatch errors in the logs
     model = tf.keras.models.load_model(model_path, compile=False)
-    # Re-compile manually for inference
+    # Re-compile manually for inference only
     model.compile(optimizer='adam', loss='sparse_categorical_crossentropy')
     print("Model loaded successfully!")
 except Exception as e:
@@ -33,13 +33,13 @@ try:
     scaler = joblib.load(os.path.join(BASE_DIR, 'scaler.joblib'))
     pca = joblib.load(os.path.join(BASE_DIR, 'pca_model.joblib'))
     le = joblib.load(os.path.join(BASE_DIR, 'label_encoder.joblib'))
-    print("All assets (scaler, pca, le) loaded successfully!")
+    print("All assets loaded successfully!")
 except Exception as e:
     print(f"Error loading assets: {e}")
 
 @app.get("/")
 def home():
-    # Now this will return model_loaded: False instead of crashing if loading fails
+    # This will now return 'false' instead of a 500 error if the model fails
     return {
         "status": "IDS API is running", 
         "model_loaded": model is not None,
@@ -49,19 +49,19 @@ def home():
 @app.post("/predict")
 def predict(data: dict):
     if model is None:
-        return {"error": "Model not loaded on server. Check logs for TensorFlow version errors."}
+        return {"error": "Model not loaded. Check server logs for TensorFlow errors."}
     
     try:
         # Convert incoming JSON data to DataFrame
         df = pd.DataFrame([data])
         
-        # Preprocessing (Z-Score Normalization)
+        # Preprocessing
         scaled_data = scaler.transform(df)
         
-        # Feature Engineering (PCA)
+        # Feature Engineering
         pca_data = pca.transform(scaled_data)
         
-        # Prediction (DNN Inference)
+        # Prediction
         prediction = model.predict(pca_data)
         class_idx = np.argmax(prediction)
         
