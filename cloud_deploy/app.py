@@ -1,12 +1,12 @@
 import os
-# Try to force Keras 2 behavior if Keras 3 fails
+# This tells TensorFlow to use the legacy bridge we just added to requirements
 os.environ["TF_USE_LEGACY_KERAS"] = "1" 
 
 from fastapi import FastAPI
 import pandas as pd
 import joblib
-import tensorflow as tf
 import numpy as np
+import tf_keras as keras # Use the bridge directly
 
 app = FastAPI()
 
@@ -22,28 +22,19 @@ try:
     scaler = joblib.load(os.path.join(BASE_DIR, 'scaler.joblib'))
     pca = joblib.load(os.path.join(BASE_DIR, 'pca_model.joblib'))
     le = joblib.load(os.path.join(BASE_DIR, 'label_encoder.joblib'))
-    print("Assets loaded.")
+    print("Assets loaded successfully.")
 except Exception as e:
     print(f"Asset Error: {e}")
 
-# --- MODEL LOADING (Dual-Strategy) ---
+# --- MODEL LOADING ---
 try:
     model_path = os.path.join(BASE_DIR, 'ids_model.h5')
-    
-    # Strategy A: Standard Load
-    model = tf.keras.models.load_model(model_path, compile=False)
+    # Use the legacy keras bridge to load the older .h5 format
+    model = keras.models.load_model(model_path, compile=False)
     model.compile(optimizer='adam', loss='sparse_categorical_crossentropy')
-    print("Strategy A Success: Model loaded.")
+    print("Model loaded successfully using legacy bridge!")
 except Exception as e:
-    print(f"Strategy A failed, trying Strategy B... Error: {e}")
-    try:
-        # Strategy B: Use the specific h5py engine
-        import h5py
-        model = tf.keras.models.load_model(model_path, compile=False, safe_mode=False)
-        model.compile(optimizer='adam', loss='sparse_categorical_crossentropy')
-        print("Strategy B Success: Model loaded with safe_mode=False.")
-    except Exception as e2:
-        print(f"Strategy B failed: {e2}")
+    print(f"Model load failed: {e}")
 
 @app.get("/")
 def home():
@@ -52,20 +43,3 @@ def home():
         "model_loaded": model is not None,
         "assets_loaded": all([scaler, pca, le])
     }
-
-@app.post("/predict")
-def predict(data: dict):
-    if model is None:
-        return {"error": "Model is not loaded. Check Render logs for specific Keras/H5 errors."}
-    try:
-        df = pd.DataFrame([data])
-        scaled_data = scaler.transform(df)
-        pca_data = pca.transform(scaled_data)
-        prediction = model.predict(pca_data)
-        class_idx = np.argmax(prediction)
-        return {
-            "prediction": str(le.classes_[class_idx]),
-            "confidence": float(np.max(prediction))
-        }
-    except Exception as e:
-        return {"error": str(e)}
