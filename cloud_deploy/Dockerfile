@@ -2,16 +2,18 @@ FROM python:3.9-slim
 
 WORKDIR /app
 
-# Copy EVERYTHING from your GitHub repo into /app
+# Copy everything from GitHub
 COPY . .
 
-# Install dependencies by pointing directly to the file inside the subfolder
-# This ensures it doesn't matter what the "current" directory is
-RUN pip install --no-cache-dir -r cloud_deploy/requirements.txt
+# 1. FIND the requirements file (wherever it is) and install it
+RUN pip install --no-cache-dir -r $(find . -name requirements.txt | head -n 1)
 
-# Expose the port
+# 2. FIND the app.py file and its directory
+# We will use a script to start the app so we don't have to hardcode the path
 EXPOSE 8000
 
-# Run uvicorn by pointing to the app file inside the cloud_deploy folder
-# We use 'cloud_deploy.app:app' to tell Python exactly where the module is
-CMD ["uvicorn", "cloud_deploy.app:app", "--host", "0.0.0.0", "--port", "8000"]
+# This command finds app.py, gets its directory, and starts uvicorn from there
+CMD ["sh", "-c", "export APP_PATH=$(find . -name app.py | head -n 1) && \
+     export APP_DIR=$(dirname $APP_PATH) && \
+     cd $APP_DIR && \
+     uvicorn app:app --host 0.0.0.0 --port 8000"]
