@@ -4,5 +4,6 @@ pandas
 joblib
 scikit-learn==1.6.1
 tensorflow==2.15.0
+tf_keras
 h5py
 numpy<2.0.0
