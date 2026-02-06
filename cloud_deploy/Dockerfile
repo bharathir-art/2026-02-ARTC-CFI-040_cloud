@@ -2,13 +2,16 @@ FROM python:3.9-slim
 
 WORKDIR /app
 
-# Copy requirements from inside the subfolder
-COPY cloud_deploy/requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+# This copies EVERYTHING from your repo into the container
+COPY . .
 
-# Copy the CONTENTS of cloud_deploy into /app
-COPY cloud_deploy/ .
+# Now we move INTO the cloud_deploy folder where your files actually are
+WORKDIR /app/cloud_deploy
+
+# Install from the requirements file inside that folder
+RUN pip install --no-cache-dir -r requirements.txt
 
 EXPOSE 8000
 
+# Run uvicorn pointing to the app.py inside cloud_deploy
 CMD ["uvicorn", "app:app", "--host", "0.0.0.0", "--port", "8000"]
